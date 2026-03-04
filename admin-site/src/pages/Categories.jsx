@@ -23,7 +23,7 @@ export default function Categories() {
     const fetchCategories = async () => {
         setLoading(true);
         try {
-            const res = await apiFetch(`http://localhost:4000/api/categories?shop=${activeStore.toLowerCase()}`);
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/categories?shop=${activeStore.toLowerCase()}`);
             const data = await res.json();
             if (data.success) {
                 const mappedCategories = data.data.map(c => ({
@@ -66,7 +66,7 @@ export default function Categories() {
             confirmProps: { color: 'red' },
             onConfirm: async () => {
                 try {
-                    const res = await apiFetch(`http://localhost:4000/api/categories/${category.id}`, {
+                    const res = await apiFetch(`${import.meta.env.VITE_API_URL}/categories/${category.id}`, {
                         method: 'DELETE'
                     });
                     const data = await res.json();

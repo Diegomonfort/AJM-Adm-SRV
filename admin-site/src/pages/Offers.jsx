@@ -23,7 +23,7 @@ export default function Offers() {
         setLoading(true);
         try {
             // Obtener las ofertas actuales
-            const resOffers = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&discount=true`);
+            const resOffers = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&discount=true`);
             const dataOffers = await resOffers.json();
 
             if (dataOffers.success) {
@@ -44,7 +44,7 @@ export default function Offers() {
             }
 
             // Obtener todos para el modal (omitiendo los que ya están en oferta)
-            const resAll = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&limit=200`);
+            const resAll = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&limit=200`);
             const dataAll = await resAll.json();
 
             if (dataAll.success) {
@@ -74,7 +74,7 @@ export default function Offers() {
 
     const updateProductOffer = async (productId, status, discountValue = 0) => {
         try {
-            const res = await apiFetch(`http://localhost:4000/api/products/${productId}`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ discount: status, discount_value: discountValue })

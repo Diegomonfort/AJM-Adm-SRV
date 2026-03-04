@@ -35,7 +35,7 @@ export default function Products() {
     const fetchProducts = async (currentPage = page, cat = categoryFilter) => {
         setLoading(true);
         try {
-            const res = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&page=${currentPage}&limit=12&category=${cat}`);
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&page=${currentPage}&limit=12&category=${cat}`);
             const data = await res.json();
             if (data.success) {
                 // Mapear los datos de Supabase para que coincidan con la estructura que espera la tabla.
@@ -50,7 +50,6 @@ export default function Products() {
                     // Si no tiene imagen, se usa la de repuesto.
                     image: p.Imagen || motosierraImg,
                     marca: p.Marca,
-                    modelo: p.Modelo,
                     modelo: p.Modelo,
                     multimedia_array: p.multimedia_array || [],
                 }));
@@ -77,7 +76,7 @@ export default function Products() {
         setSearchOpened(true);
         setIsSearching(true);
         try {
-            const res = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&search=${query}&limit=5`);
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&search=${query}&limit=5`);
             const data = await res.json();
             if (data.success) {
                 setSearchResults(data.data);
@@ -91,7 +90,7 @@ export default function Products() {
 
     const loadCategories = async () => {
         try {
-            const res = await apiFetch(`http://localhost:4000/api/categories?shop=${activeStore.toLowerCase()}`);
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/categories?shop=${activeStore.toLowerCase()}`);
             const data = await res.json();
             if (data.success) {
                 setGlobalCategories(data.data.map(c => ({ value: String(c.id), label: c.Nombre })));
@@ -138,7 +137,7 @@ export default function Products() {
             confirmProps: { color: 'red' },
             onConfirm: async () => {
                 try {
-                    const res = await apiFetch(`http://localhost:4000/api/products/${product.id}`, {
+                    const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products/${product.id}`, {
                         method: 'DELETE'
                     });
                     const data = await res.json();

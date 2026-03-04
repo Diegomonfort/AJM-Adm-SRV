@@ -24,7 +24,7 @@ export default function Featured() {
         setLoading(true);
         try {
             // Fetch destacados
-            const resFeatured = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&destacados=true`);
+            const resFeatured = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&destacados=true`);
             const dataFeatured = await resFeatured.json();
 
             if (dataFeatured.success) {
@@ -40,7 +40,7 @@ export default function Featured() {
             }
 
             // Fetch todo para el modal (limit grande). Omitiendo los ya destacados.
-            const resAll = await apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&limit=200`);
+            const resAll = await apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&limit=200`);
             const dataAll = await resAll.json();
 
             if (dataAll.success) {
@@ -70,7 +70,7 @@ export default function Featured() {
 
     const updateProductStatus = async (productId, status) => {
         try {
-            const res = await apiFetch(`http://localhost:4000/api/products/${productId}`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ destacados: status })

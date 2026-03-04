@@ -58,8 +58,8 @@ export default function EditCategoryModal({ opened, onClose, category, onSave })
             }
 
             const url = category
-                ? `http://localhost:4000/api/categories/${category.id}`
-                : `http://localhost:4000/api/categories`;
+                ? `${import.meta.env.VITE_API_URL}/categories/${category.id}`
+                : `${import.meta.env.VITE_API_URL}/categories`;
             const method = category ? 'PUT' : 'POST';
 
             const res = await apiFetch(url, {

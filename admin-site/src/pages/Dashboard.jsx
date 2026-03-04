@@ -25,8 +25,8 @@ export default function Dashboard() {
         setLoading(true);
         try {
             const [transRes, prodRes] = await Promise.all([
-                apiFetch(`http://localhost:4000/api/transactions?shop=${activeStore.toLowerCase()}`),
-                apiFetch(`http://localhost:4000/api/products?shop=${activeStore.toLowerCase()}&limit=1000`)
+                apiFetch(`${import.meta.env.VITE_API_URL}/transactions?shop=${activeStore.toLowerCase()}`),
+                apiFetch(`${import.meta.env.VITE_API_URL}/products?shop=${activeStore.toLowerCase()}&limit=1000`)
             ]);
             if (transRes.ok) {
                 const data = await transRes.json();

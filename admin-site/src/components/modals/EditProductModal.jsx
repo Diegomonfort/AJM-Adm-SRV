@@ -84,8 +84,8 @@ export default function EditProductModal({ opened, onClose, product, onSave, cat
             }
 
             const url = product
-                ? `http://localhost:4000/api/products/${product.id}`
-                : `http://localhost:4000/api/products`;
+                ? `${import.meta.env.VITE_API_URL}/products/${product.id}`
+                : `${import.meta.env.VITE_API_URL}/products`;
             const method = product ? 'PUT' : 'POST';
 
             const res = await apiFetch(url, {

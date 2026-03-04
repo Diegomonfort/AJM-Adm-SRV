@@ -20,7 +20,7 @@ export default function SpecsProductModal({ opened, onClose, product, onSave }) 
     useEffect(() => {
         if (opened && product) {
             setLoading(true);
-            apiFetch(`http://localhost:4000/api/products/${product.id}/specs`)
+            apiFetch(`${import.meta.env.VITE_API_URL}/products/${product.id}/specs`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -61,7 +61,7 @@ export default function SpecsProductModal({ opened, onClose, product, onSave }) 
                 confirmProps: { color: 'red' },
                 onConfirm: async () => {
                     try {
-                        const res = await apiFetch(`http://localhost:4000/api/products/${product.id}/specs/${specToRemove.id}`, {
+                        const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products/${product.id}/specs/${specToRemove.id}`, {
                             method: 'DELETE'
                         });
                         const data = await res.json();
@@ -105,7 +105,7 @@ export default function SpecsProductModal({ opened, onClose, product, onSave }) 
         if (!product) return;
         setSaving(true);
         try {
-            const res = await apiFetch(`http://localhost:4000/api/products/${product.id}/specs`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL}/products/${product.id}/specs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ specs })
