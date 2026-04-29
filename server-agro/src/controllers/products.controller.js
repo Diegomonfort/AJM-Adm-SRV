@@ -26,7 +26,8 @@ export const getProductsByShop = async (req, res) => {
             .select(`
                 id, created_at, Producto, Marca, Descripcion, Imagen, Precio, 
                 Categoria, categorias(Nombre), 
-                destacados, activo, discount, discount_value, multimedia_array, shop
+                destacados, activo, discount, discount_value, multimedia_array, shop,
+                destacados_img
             `, { count: 'exact' }) // Para obtener el total de registros
             .ilike('shop', shop);
 
@@ -196,35 +197,52 @@ export const createProduct = async (req, res) => {
             productData.Precio = parseFloat(productData.Precio) || 0;
         }
 
-        if (req.file) {
-            const file = req.file;
-            const fileExtension = file.originalname.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-            const filePath = `productos/${fileName}`;
+        // Manejo de archivos (imagen principal y destacados_img)
+        const files = req.files;
+        if (files) {
+            const handleUpload = async (file, fieldName) => {
+                const fileExtension = file.originalname.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                const filePath = `productos/${fileName}`;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('fotosProductos')
-                .upload(filePath, file.buffer, {
-                    contentType: file.mimetype,
-                    upsert: false
-                });
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('fotosProductos')
+                    .upload(filePath, file.buffer, {
+                        contentType: file.mimetype,
+                        upsert: false
+                    });
 
-            if (uploadError) {
-                console.error('Error subiendo imagen a Supabase (Product):', uploadError);
-                return res.status(500).json({ success: false, message: 'La imagen principal no pudo subirse.' });
+                if (uploadError) {
+                    console.error(`Error subiendo ${fieldName} a Supabase (Product Create):`, uploadError);
+                    throw new Error(`La imagen para ${fieldName} no pudo subirse.`);
+                }
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('fotosProductos')
+                    .getPublicUrl(filePath);
+
+                return publicUrlData.publicUrl;
+            };
+
+            if (files.imagen?.[0]) {
+                productData.Imagen = await handleUpload(files.imagen[0], 'Imagen');
+            } else if (req.body.imagenUrl) {
+                productData.Imagen = req.body.imagenUrl;
             }
 
-            const { data: publicUrlData } = supabase.storage
-                .from('fotosProductos')
-                .getPublicUrl(filePath);
-
-            productData.Imagen = publicUrlData.publicUrl;
-        } else if (req.body.imagenUrl) {
-            productData.Imagen = req.body.imagenUrl;
+            if (files.destacados_img?.[0]) {
+                productData.destacados_img = await handleUpload(files.destacados_img[0], 'destacados_img');
+            } else if (req.body.destacados_img_url) {
+                productData.destacados_img = req.body.destacados_img_url;
+            }
+        } else {
+            if (req.body.imagenUrl) productData.Imagen = req.body.imagenUrl;
+            if (req.body.destacados_img_url) productData.destacados_img = req.body.destacados_img_url;
         }
 
-        // Clean up temp field
+        // Clean up temp fields
         delete productData.imagenUrl;
+        delete productData.destacados_img_url;
 
         const { data, error } = await supabase
             .from('productos')
@@ -272,34 +290,52 @@ export const updateProduct = async (req, res) => {
             productData.Precio = parseFloat(productData.Precio) || 0;
         }
 
-        if (req.file) {
-            const file = req.file;
-            const fileExtension = file.originalname.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-            const filePath = `productos/${fileName}`;
+        // Manejo de archivos (imagen principal y destacados_img)
+        const files = req.files;
+        if (files) {
+            const handleUpload = async (file, fieldName) => {
+                const fileExtension = file.originalname.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                const filePath = `productos/${fileName}`;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('fotosProductos')
-                .upload(filePath, file.buffer, {
-                    contentType: file.mimetype,
-                    upsert: false
-                });
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('fotosProductos')
+                    .upload(filePath, file.buffer, {
+                        contentType: file.mimetype,
+                        upsert: false
+                    });
 
-            if (uploadError) {
-                console.error('Error subiendo imagen a Supabase (Product Update):', uploadError);
-                return res.status(500).json({ success: false, message: 'La imagen principal no pudo subirse.' });
+                if (uploadError) {
+                    console.error(`Error subiendo ${fieldName} a Supabase:`, uploadError);
+                    throw new Error(`La imagen para ${fieldName} no pudo subirse.`);
+                }
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('fotosProductos')
+                    .getPublicUrl(filePath);
+
+                return publicUrlData.publicUrl;
+            };
+
+            if (files.imagen?.[0]) {
+                productData.Imagen = await handleUpload(files.imagen[0], 'Imagen');
+            } else if (req.body.imagenUrl) {
+                productData.Imagen = req.body.imagenUrl;
             }
 
-            const { data: publicUrlData } = supabase.storage
-                .from('fotosProductos')
-                .getPublicUrl(filePath);
-
-            productData.Imagen = publicUrlData.publicUrl;
-        } else if (req.body.imagenUrl) {
-            productData.Imagen = req.body.imagenUrl;
+            if (files.destacados_img?.[0]) {
+                productData.destacados_img = await handleUpload(files.destacados_img[0], 'destacados_img');
+            } else if (req.body.destacados_img_url) {
+                productData.destacados_img = req.body.destacados_img_url;
+            }
+        } else {
+            // Caso sin archivos (si multer se configuró diferente o no se enviaron)
+            if (req.body.imagenUrl) productData.Imagen = req.body.imagenUrl;
+            if (req.body.destacados_img_url) productData.destacados_img = req.body.destacados_img_url;
         }
 
         delete productData.imagenUrl;
+        delete productData.destacados_img_url;
 
         const { data, error } = await supabase
             .from('productos')

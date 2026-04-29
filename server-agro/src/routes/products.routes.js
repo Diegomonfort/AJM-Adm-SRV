@@ -10,8 +10,8 @@ const router = Router();
 router.get('/', authMiddleware, getProductsByShop);
 
 // POST /api/products
-router.post('/', authMiddleware, upload.single('imagen'), createProduct);
-router.put('/:id', authMiddleware, upload.single('imagen'), updateProduct);
+router.post('/', authMiddleware, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'destacados_img', maxCount: 1 }]), createProduct);
+router.put('/:id', authMiddleware, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'destacados_img', maxCount: 1 }]), updateProduct);
 router.delete('/:id', authMiddleware, deleteProduct);
 
 // Rutas para product_specs

@@ -1,0 +1,252 @@
+# Análisis de Integración Plexo — AgroJardin API
+
+## 🗺️ Resumen del Flujo
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant BE as Backend (Node/Express)
+    participant DB as Supabase
+    participant PX as Plexo API
+    participant EMAIL as Brevo (Email)
+
+    FE->>BE: POST /api/payment { datosPersonales, direccionEnvio, products }
+    BE->>DB: Consulta productos por ID (precio, descuento)
+    BE->>DB: INSERT transaccion (estado=1 "pendiente")
+    BE->>BE: Genera payload firmado con clave privada PFX (SHA512 + RSA PKCS1)
+    BE->>PX: POST /ExpressCheckout (payload firmado)
+    PX-->>BE: { RedirectUrl, token de sesión, ... }
+    BE-->>FE: { RedirectUrl, transaccionId }
+
+    FE->>FE: Redirige al usuario a la URL de Plexo para pagar
+
+    PX->>BE: POST /api/webhook (callback automático)
+    BE->>DB: UPDATE transaccion SET estado = (0=OK / 1=Error)
+
+    FE->>FE: Plexo redirige a https://agrojardinmaldonado.com/Verify?...
+    FE->>BE: GET /api/verify-payment?transaccion_id=X
+    BE->>DB: SELECT estado WHERE id = X
+    BE-->>FE: { info: true, status: 0 } ← Aprobado / { info: true, status: 1 } ← Error
+
+    FE->>BE: GET /api/send-email?transaccion_id=X
+    BE->>EMAIL: Envía email al cliente y al comercio (via Brevo)
+```
+
+---
+
+## 📁 Estructura de Archivos
+
+| Archivo | Rol |
+|---|---|
+| `server.js` | Entry point Express, monta rutas bajo `/api` |
+| `src/routes/ExpressCheckoutRoutes.js` | Define los 5 endpoints de pago |
+| `src/controllers/ExpressCheckoutController.js` | Lógica completa del flujo |
+| `utils/plexo.utils.js` | Carga la clave privada del archivo `.pfx` |
+| `certs/agrojardin.pfx` | Certificado digital con clave privada de Plexo |
+
+---
+
+## 🔗 Endpoints (todos bajo `/api`)
+
+| Método | Ruta | Función | Descripción |
+|---|---|---|---|
+| `POST` | `/payment` | `RecibeInfoExpressCheckout` | Inicia el checkout con Plexo |
+| `POST` | `/webhook` | `Callback` | Recibe notificación de Plexo al completarse el pago |
+| `GET` | `/verify-payment` | `verifyPayment` | Frontend consulta si la transacción fue aprobada |
+| `GET` | `/send-email` | `sendEmail` | Dispara emails de confirmación (cliente + interno) |
+| `POST` | `/update-tran` | `updateTransaction` | Actualiza manualmente el estado de una transacción |
+| `POST` | `/check-transaction` | `ConsultaEstadoTransaccion` | Consulta el estado directamente en Plexo |
+
+---
+
+## 🔐 Mecanismo de Firma (Crítico para migración)
+
+Plexo requiere que **todo payload esté firmado digitalmente**. El proceso es:
+
+1. **Cargar la clave privada** desde el archivo `.pfx` usando `node-forge`
+2. **Canonicalizar el objeto** (ordenar todas las keys alfabéticamente, recursivamente)
+3. **Construir el payload a firmar:**
+   ```json
+   {
+     "Fingerprint": "41749F756FAC1A308FFF1407CB600B77DE978C0D",
+     "Object": { /* objeto canonicalizado */ },
+     "UTCUnixTimeExpiration": 1234567890000
+   }
+   ```
+4. **Serializar a JSON compacto** (sin espacios)
+5. **Parche especial de decimales**: Plexo requiere que todos los montos sean floats. Se aplican regex:
+   - `"BilledAmount":500` → `"BilledAmount":500.0`
+   - `"TaxedAmount":450` → `"TaxedAmount":450.0`
+   - `"Amount":100` → `"Amount":100.0`
+6. **Firmar con SHA512 + RSA PKCS1** usando Node.js `crypto`
+7. **Payload final enviado a Plexo:**
+   ```json
+   { "Object": { ...payloadFirmado }, "Signature": "base64string..." }
+   ```
+
+> [!IMPORTANT]
+> El `Fingerprint` es el SHA1 del certificado público de Plexo (no el tuyo). Es **hardcodeado** y es un valor fijo para el ambiente de producción de tu comercio.
+
+---
+
+## 📦 Payload del ExpressCheckout
+
+### Request al backend (`POST /api/payment`)
+```json
+{
+  "datosPersonales": {
+    "email": "cliente@mail.com",
+    "telefono": "099123456"
+  },
+  "direccionEnvio": {
+    "nombre": "Juan",
+    "apellido": "Pérez",
+    "direccion": "Av. Principal 123",
+    "ciudad": "Maldonado",
+    "codigoPostal": "20000"
+  },
+  "products": [
+    { "id": 5, "quantity": 1 },
+    { "id": 12, "quantity": 2 }
+  ]
+}
+```
+
+### Estructura enviada a Plexo (`POST /ExpressCheckout`)
+```json
+{
+  "Client": "agrojardin",
+  "Request": {
+    "AuthorizationData": {
+      "Action": 64,
+      "ClientInformation": { "Name": "...", "LastName": "...", "Address": "...", "Email": "..." },
+      "DoNotUseCallback": true,
+      "LimitBanks": ["113", "137"],
+      "LimitIssuers": ["4", "11"],
+      "MetaReference": "email@cliente.com",
+      "OptionalCommerceId": 45274,
+      "RedirectUri": "https://www.agrojardinmaldonado.com/Verify",
+      "Type": 0
+    },
+    "PaymentData": {
+      "ClientReferenceId": "ID_TRANSACCION_SUPABASE",
+      "CurrencyId": 2,
+      "FinancialInclusion": {
+        "BilledAmount": 500.0,
+        "InvoiceNumber": 9869,
+        "TaxedAmount": 450.0,
+        "Type": 1
+      },
+      "Installments": 1,
+      "Items": [
+        { "Amount": 500.0, "ClientItemReferenceId": "Item-5", "Name": "Motosierra X", "Quantity": 1 }
+      ],
+      "OptionalCommerceId": 45274,
+      "PaymentInstrumentInput": {
+        "NonStorableItems": { "CVC": "123" },
+        "OptionalInstrumentFields": {
+          "ShippingAddress": "...", "ShippingZipCode": "...",
+          "ShippingCity": "...", "ShippingCountry": "UY",
+          "ShippingFirstName": "...", "ShippingLastName": "...",
+          "ShippingPhoneNumber": "..."
+        },
+        "UseExtendedClientCreditIfAvailable": false
+      }
+    }
+  }
+}
+```
+
+### Respuesta esperada de Plexo
+```json
+{
+  "RedirectUrl": "https://pagos.plexo.com.uy/checkout?session=...",
+  "SessionToken": "...",
+  "transaccionId": 42
+}
+```
+
+---
+
+## 🪝 Webhook de Plexo (`POST /api/webhook`)
+
+Plexo envía automáticamente un POST cuando el pago se completa:
+
+```json
+{
+  "Object": {
+    "Object": {
+      "Transactions": {
+        "Purchase": {
+          "ClientReferenceId": "42",
+          "Status": 0
+        }
+      }
+    }
+  }
+}
+```
+
+**Lógica de estado:**
+- `Status === 0` → Pago **exitoso** → `estado = 0` en DB
+- `Status !== 0` → Pago **fallido/rechazado** → `estado = 1` en DB
+
+> [!WARNING]
+> El campo `DoNotUseCallback: true` en la solicitud original **deshabilita** el webhook de Plexo. Si querés usarlo, cambiarlo a `false`. Actualmente el flujo depende del polling desde el frontend con `/verify-payment`.
+
+---
+
+## 🗃️ Tabla `transacciones` en Supabase
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | UUID/int | PK, usado como `ClientReferenceId` en Plexo |
+| `email` | text | Email del comprador |
+| `nombre_completo` | text | Nombre + apellido |
+| `celular` | text | Teléfono |
+| `direccion` | text | Dirección de envío |
+| `departamento` | text | Ciudad/departamento |
+| `codigo_postal` | text | CP |
+| `productos` | jsonb | Array de objetos `{ id }` |
+| `total` | numeric | Total de la compra |
+| `estado` | int | `0`=Aprobado, `1`=Pendiente/Error |
+
+---
+
+## 📧 Emails con Brevo
+
+Cuando el pago se confirma, el frontend llama a `GET /api/send-email?transaccion_id=X` que:
+1. Busca la transacción y los productos en Supabase
+2. Envía **email al cliente** con detalle de compra e info de envío
+3. Envía **email interno** a `husqvarnapremiumstore@agrojardinmaldonado.com` con los mismos datos
+
+---
+
+## ✅ Checklist para Migrar al Nuevo Backend
+
+- [ ] **Copiar el certificado** `certs/agrojardin.pfx` al nuevo backend
+- [ ] **Copiar `utils/plexo.utils.js`** (o reimplementar con `node-forge`)
+- [ ] Instalar dependencias: `node-forge`, `axios`, `moment`, `crypto` (nativo)
+- [ ] Replicar la función **`canonicalize`** (ordenamiento recursivo de keys)
+- [ ] Replicar el **parche de decimales** en el JSON serializado (regex)
+- [ ] Configurar variables de entorno:
+  - `SUPABASE_URL`, `SUPABASE_KEY` (o equivalente ORM)
+  - `BREVO_API_KEY`
+  - `JWT_SECRET`
+- [ ] Exponer el endpoint `/webhook` **sin autenticación** (Plexo no envía JWT)
+- [ ] Verificar que `RedirectUri` apunte a la página correcta del nuevo frontend
+
+---
+
+## ⚙️ Valores de Configuración Hardcodeados
+
+| Valor | Significado |
+|---|---|
+| `Client: "agrojardin"` | Identificador del comercio en Plexo |
+| `OptionalCommerceId: 45274` | ID del comercio Plexo (aparece 2 veces en el payload) |
+| `Fingerprint: "41749F756FAC..."` | SHA1 del certificado de Plexo (no cambiar) |
+| `LimitBanks: ["113", "137"]` | Bancos habilitados (BROU=113, Itaú=137) |
+| `LimitIssuers: ["4", "11"]` | Emisores habilitados (Visa=4, OCA=11) |
+| `CurrencyId: 2` | Moneda: pesos uruguayos (UYU) |
+| `InvoiceNumber: 9869` | Número de factura fijo (revisar si debe ser dinámico) |
+| `pfxPassword: "hGGLJOxE1LDpLGQa15"` | Contraseña del certificado PFX |

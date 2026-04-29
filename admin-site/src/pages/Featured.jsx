@@ -1,12 +1,13 @@
 import { apiFetch } from '../config/api';
 import { useState, useEffect } from 'react';
 import { Title, Card, Text, Button, Group, SimpleGrid, Image, ActionIcon, Menu, Box, Loader } from '@mantine/core';
-import { Plus, MoreVertical, Trash2 } from 'lucide-react';
+import { Plus, MoreVertical, Trash2, Image as ImageIcon } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import SelectFeaturedModal from '../components/modals/SelectFeaturedModal';
+import FeaturedImageModal from '../components/modals/FeaturedImageModal';
 import motosierraImg from '../assets/motosierra.png';
 
 export default function Featured() {
@@ -14,6 +15,8 @@ export default function Featured() {
     const primaryColor = activeStore === 'Husqvarna' ? 'blue' : 'orange';
 
     const [opened, { open, close }] = useDisclosure(false);
+    const [imgOpened, { open: openImg, close: closeImg }] = useDisclosure(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [availableToFeature, setAvailableToFeature] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,7 +38,8 @@ export default function Featured() {
                     category: p.categorias?.Nombre || 'Sin Categoría',
                     active: p.activo,
                     price: p.Precio,
-                    image: p.Imagen || motosierraImg
+                    image: p.Imagen || motosierraImg,
+                    destacados_img: p.destacados_img
                 })));
             }
 
@@ -121,6 +125,11 @@ export default function Featured() {
         fetchData();
     };
 
+    const handleFeaturedImage = (product) => {
+        setSelectedProduct(product);
+        openImg();
+    };
+
     return (
         <div>
             <Group justify="space-between" mb="xl" align="flex-start">
@@ -160,7 +169,7 @@ export default function Featured() {
                     >
                         {/* Image Wrapper */}
                         <div style={{ position: 'relative', backgroundColor: '#F9FAFB', padding: '20px', display: 'flex', justifyContent: 'center', borderBottom: '1px solid #E5E7EB' }}>
-                            <Image src={product.image} h={140} w="auto" fit="contain" style={{ mixBlendMode: 'multiply' }} alt={product.name} />
+                            <Image src={product.destacados_img || product.image} h={140} w="auto" fit="contain" style={{ mixBlendMode: 'multiply' }} alt={product.name} />
 
                             <Menu withinPortal position="bottom-end" shadow="md">
                                 <Menu.Target>
@@ -169,6 +178,10 @@ export default function Featured() {
                                     </ActionIcon>
                                 </Menu.Target>
                                 <Menu.Dropdown radius={0} p={4}>
+                                    <Menu.Item leftSection={<ImageIcon size={16} />} onClick={() => handleFeaturedImage(product)} fw={500}>
+                                        Imagen Destacada
+                                    </Menu.Item>
+                                    <Menu.Divider />
                                     <Menu.Item leftSection={<Trash2 size={16} />} color="red" onClick={() => handleRemoveFeatured(product)} fw={500}>
                                         Quitar de Destacados
                                     </Menu.Item>
@@ -196,6 +209,13 @@ export default function Featured() {
                 availableProducts={availableToFeature}
                 onSave={handleAddFeatured}
                 selectionRemaining={5 - featuredProducts.length}
+            />
+
+            <FeaturedImageModal
+                opened={imgOpened}
+                onClose={closeImg}
+                product={selectedProduct}
+                onSave={fetchData}
             />
         </div>
     );
