@@ -153,15 +153,21 @@ export const iniciarPago = async (req, res) => {
         // 5. Firmar y enviar a Plexo
         const signedBody = signPayload(plexoPayload);
 
+        const plexoUrl = `${PLEXO_API_URL}/ExpressCheckout`;
+        console.log('[Plexo] Enviando request a:', plexoUrl);
+
         const plexoRes = await axios.post(
-            `${PLEXO_API_URL}/ExpressCheckout`,
+            plexoUrl,
             signedBody,
             { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
         );
 
+        console.log('[Plexo] Respuesta status:', plexoRes.status);
+        console.log('[Plexo] Respuesta data:', JSON.stringify(plexoRes.data));
+
         const redirectUrl = plexoRes.data?.RedirectUrl || plexoRes.data?.Object?.RedirectUrl;
         if (!redirectUrl) {
-            console.error('Respuesta Plexo sin RedirectUrl:', plexoRes.data);
+            console.error('[Plexo] Respuesta sin RedirectUrl:', plexoRes.data);
             return res.status(502).json({ success: false, message: 'Respuesta inesperada de Plexo.' });
         }
 
@@ -172,7 +178,12 @@ export const iniciarPago = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error en iniciarPago:', error?.response?.data || error.message);
+        const errData = error?.response?.data;
+        const errStatus = error?.response?.status;
+        const errUrl = error?.config?.url;
+        console.error(`[Plexo] ERROR ${errStatus} al llamar: ${errUrl}`);
+        console.error('[Plexo] Respuesta:', JSON.stringify(errData));
+        console.error('[Plexo] Mensaje:', error.message);
         return res.status(500).json({ success: false, message: 'Error interno al procesar el pago.' });
     }
 };
@@ -448,7 +459,7 @@ export const consultarEstadoPlexo = async (req, res) => {
         const signedBody = signPayload(queryPayload);
 
         const plexoRes = await axios.post(
-            `${PLEXO_API_URL}/GetTransactionStatus`,
+            `${PLEXO_API_URL}/Operation/Status`,
             signedBody,
             { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
         );

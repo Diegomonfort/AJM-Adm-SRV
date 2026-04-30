@@ -15,13 +15,15 @@ const PFX_PASSWORD = 'hGGLJOxE1LDpLGQa15';
 export const PLEXO_FINGERPRINT = '41749F756FAC1A308FFF1407CB600B77DE978C0D';
 
 // ─── Valores fijos del comercio ───────────────────────────────────────────────
-export const PLEXO_CLIENT         = 'agrojardin';
-export const PLEXO_COMMERCE_ID    = 45274;
-export const PLEXO_CURRENCY_ID    = 2;      // UYU
-export const PLEXO_LIMIT_BANKS    = ['113', '137']; // BROU, Itaú
-export const PLEXO_LIMIT_ISSUERS  = ['4', '11'];    // Visa, OCA
-export const PLEXO_REDIRECT_URI   = 'https://www.agrojardinmaldonado.com/Verify';
-export const PLEXO_API_URL        = 'https://api.plexo.com.uy';
+export const PLEXO_CLIENT        = 'agrojardin';
+export const PLEXO_COMMERCE_ID   = 45274;
+export const PLEXO_CURRENCY_ID   = 2;       // UYU
+export const PLEXO_LIMIT_BANKS   = ['113', '137']; // BROU, Itaú
+export const PLEXO_LIMIT_ISSUERS = ['4', '11'];    // Visa, OCA
+export const PLEXO_REDIRECT_URI  = 'https://www.agrojardinmaldonado.com/Verify';
+
+// URL correcta de producción con puerto (igual al backend original)
+export const PLEXO_API_URL = 'https://pagos.plexo.com.uy:4043/SecurePaymentGateway.svc';
 
 // ─── Carga de clave privada ───────────────────────────────────────────────────
 let _privateKey = null;
@@ -57,42 +59,48 @@ export function canonicalize(obj) {
     return obj;
 }
 
-// ─── Parche de decimales (Plexo requiere floats en montos) ───────────────────
+// ─── Parche de decimales (idéntico al backend original) ───────────────────────
+// Captura el carácter siguiente (coma o llave de cierre) para no romper el JSON
 export function patchDecimals(jsonStr) {
     return jsonStr
-        .replace(/"BilledAmount":(\d+)(?!\.\d)/g, '"BilledAmount":$1.0')
-        .replace(/"TaxedAmount":(\d+)(?!\.\d)/g,  '"TaxedAmount":$1.0')
-        .replace(/"Amount":(\d+)(?!\.\d)/g,        '"Amount":$1.0');
+        .replace(/"BilledAmount":(\d+)(,|})/g, '"BilledAmount":$1.0$2')
+        .replace(/"TaxedAmount":(\d+)(,|})/g,  '"TaxedAmount":$1.0$2')
+        .replace(/"Amount":(\d+)(,|})/g,        '"Amount":$1.0$2');
 }
 
 // ─── Firma SHA512 + RSA PKCS1 ─────────────────────────────────────────────────
-export function signPayload(payloadObj) {
+// El payload final enviado a Plexo es:
+//   { "Object": { Fingerprint, Object: innerObj, UTCUnixTimeExpiration }, "Signature": "..." }
+//
+// Esto es idéntico a lo que hace el backend original con:
+//   const finalPayloadJson = `{"Object":${jsonString},"Signature":"${signature}"}`;
+export function signPayload(innerObject) {
     const privateKey = getPrivateKey();
 
-    // 1. Canonicalizar el objeto
-    const canonicalized = canonicalize(payloadObj);
+    const expirationTime = Date.now() + 60 * 60 * 1000; // 1 hora (igual al original)
 
-    // 2. Construir el objeto a firmar
-    const expirationMs = Date.now() + 5 * 60 * 1000; // 5 minutos
-    const toSign = {
+    // El objeto que se firma Y que va dentro del campo "Object" del body final
+    const payloadToSign = {
         Fingerprint: PLEXO_FINGERPRINT,
-        Object: canonicalized,
-        UTCUnixTimeExpiration: expirationMs,
+        Object: canonicalize(innerObject),
+        UTCUnixTimeExpiration: expirationTime,
     };
 
-    // 3. Serializar a JSON compacto
-    let jsonStr = JSON.stringify(toSign);
+    // Serializar a JSON compacto sin espacios (igual al original)
+    let jsonString = JSON.stringify(payloadToSign, null, 0).replace(/\s+/g, '');
 
-    // 4. Parche de decimales
-    jsonStr = patchDecimals(jsonStr);
+    // Parche de decimales
+    jsonString = patchDecimals(jsonString);
 
-    // 5. Firmar con SHA512 + RSA
+    // Firmar con SHA512 + RSA PKCS1 explícito (igual al original)
     const sign = crypto.createSign('SHA512');
-    sign.update(jsonStr, 'utf8');
-    const signature = sign.sign(privateKey, 'base64');
+    sign.update(jsonString);
+    const signature = sign.sign(
+        { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+        'base64'
+    );
 
-    return {
-        Object: canonicalized,
-        Signature: signature,
-    };
+    // Construir el JSON final igual que el original:
+    // {"Object": {Fingerprint, Object: innerObj, UTCUnixTimeExpiration}, "Signature": "..."}
+    return JSON.parse(`{"Object":${jsonString},"Signature":"${signature}"}`);
 }
