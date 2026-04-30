@@ -165,7 +165,12 @@ export const iniciarPago = async (req, res) => {
         console.log('[Plexo] Respuesta status:', plexoRes.status);
         console.log('[Plexo] Respuesta data:', JSON.stringify(plexoRes.data));
 
-        const redirectUrl = plexoRes.data?.RedirectUrl || plexoRes.data?.Object?.RedirectUrl;
+        // La URL de redirección está en: data.Object.Object.Response.Uri
+        const redirectUrl =
+            plexoRes.data?.Object?.Object?.Response?.Uri ||
+            plexoRes.data?.RedirectUrl ||
+            plexoRes.data?.Object?.RedirectUrl;
+
         if (!redirectUrl) {
             console.error('[Plexo] Respuesta sin RedirectUrl:', plexoRes.data);
             return res.status(502).json({ success: false, message: 'Respuesta inesperada de Plexo.' });
