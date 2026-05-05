@@ -1,6 +1,6 @@
 import { AppShell, Burger, Group, NavLink, Title, Avatar, Text, Menu, Box, Divider, ThemeIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { Home, Package, Tags, Star, Percent, Settings, LogOut, Store as StoreIcon, ChevronDown, Bell } from 'lucide-react';
+import { Home, Package, Tags, Star, Percent, Settings, LogOut, Store as StoreIcon, ChevronDown, Bell, Link2 } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,7 @@ export default function Layout({ children }) {
     const NAV_ITEMS = [
         { icon: Home, label: 'Dashboard', link: `/${activeStoreLower}/dashboard` },
         { icon: Package, label: 'Productos', link: `/${activeStoreLower}/products` },
+        { icon: Link2, label: 'Relacionados', link: `/${activeStoreLower}/related` },
         { icon: Tags, label: 'Categorías', link: `/${activeStoreLower}/categories` },
         { icon: Star, label: 'Destacados', link: `/${activeStoreLower}/featured` },
         { icon: Percent, label: 'Ofertas', link: `/${activeStoreLower}/offers` },

@@ -22,6 +22,8 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+import RelatedProducts from './pages/RelatedProducts';
+
 function StoreWrapper() {
   const { store } = useParams();
   const { setActiveStore } = useStore();
@@ -37,6 +39,7 @@ function StoreWrapper() {
       <Routes>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="products" element={<Products />} />
+        <Route path="related" element={<RelatedProducts />} />
         <Route path="categories" element={<Categories />} />
         <Route path="featured" element={<Featured />} />
         <Route path="offers" element={<Offers />} />

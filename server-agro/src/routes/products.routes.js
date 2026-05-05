@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProductsByShop, getProductSpecs, upsertProductSpecs, deleteProductSpec, createProduct, updateProduct, deleteProduct } from '../controllers/products.controller.js';
+import { getProductsByShop, getProductSpecs, upsertProductSpecs, deleteProductSpec, createProduct, updateProduct, deleteProduct, getRelatedProducts, upsertRelatedProducts } from '../controllers/products.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -19,5 +19,9 @@ router.get('/:id/specs', authMiddleware, getProductSpecs);
 router.post('/:id/specs', authMiddleware, upsertProductSpecs);
 // También puedes usar PUT, pero POST con upsert funciona bien para crear/modificar
 router.delete('/:id/specs/:specId', authMiddleware, deleteProductSpec);
+
+// Rutas para productos relacionados
+router.get('/:id/related', authMiddleware, getRelatedProducts);
+router.post('/:id/related', authMiddleware, upsertRelatedProducts);
 
 export default router;

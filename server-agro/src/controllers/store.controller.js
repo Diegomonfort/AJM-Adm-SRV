@@ -127,6 +127,26 @@ export const getStoreProductoDetalle = async (req, res) => {
             });
         }
 
+        // Obtener productos relacionados
+        const { data: relations } = await supabase
+            .from('productos_relacionados')
+            .select('relacionado_id')
+            .eq('producto_id', id);
+
+        let relatedProducts = [];
+        if (relations && relations.length > 0) {
+            const relatedIds = relations.map(r => r.relacionado_id);
+            const { data: relProds } = await supabase
+                .from('productos')
+                .select('id, Producto, Marca, Precio, Imagen, discount, discount_value, shop')
+                .in('id', relatedIds)
+                .eq('activo', true);
+            relatedProducts = relProds || [];
+        }
+
+        // Añadir los relacionados al objeto del producto
+        producto.relacionados = relatedProducts;
+
         return res.status(200).json({
             success: true,
             data: producto

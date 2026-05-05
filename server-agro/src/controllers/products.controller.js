@@ -172,6 +172,84 @@ export const deleteProductSpec = async (req, res) => {
     }
 };
 
+export const getRelatedProducts = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'Se requiere el ID del producto principal.' });
+        }
+
+        const { data: relations, error } = await supabase
+            .from('productos_relacionados')
+            .select('relacionado_id')
+            .eq('producto_id', id);
+
+        if (error) {
+            console.error('Error al obtener relaciones:', error);
+            return res.status(500).json({ success: false, message: 'Error de base de datos.', error: error.message });
+        }
+
+        return res.status(200).json({ success: true, data: relations.map(r => r.relacionado_id) });
+    } catch (error) {
+        console.error('Error en getRelatedProducts:', error);
+        return res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    }
+};
+
+export const upsertRelatedProducts = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { relatedIds } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'Se requiere el ID del producto principal.' });
+        }
+
+        if (!Array.isArray(relatedIds)) {
+            return res.status(400).json({ success: false, message: 'Se requiere un arreglo relatedIds.' });
+        }
+
+        // 1. Borrar todas las relaciones actuales para este producto
+        const { error: deleteError } = await supabase
+            .from('productos_relacionados')
+            .delete()
+            .eq('producto_id', id);
+
+        if (deleteError) {
+            console.error('Error al eliminar relaciones previas:', deleteError);
+            return res.status(500).json({ success: false, message: 'Error al actualizar relaciones.', error: deleteError.message });
+        }
+
+        // 2. Insertar las nuevas si el arreglo no está vacío
+        if (relatedIds.length > 0) {
+            // Evitamos que se relacione a sí mismo por seguridad (y duplicados)
+            const uniqueIds = [...new Set(relatedIds.map(Number))].filter(relId => relId !== Number(id));
+            
+            if (uniqueIds.length > 0) {
+                const inserts = uniqueIds.map(relId => ({
+                    producto_id: id,
+                    relacionado_id: relId
+                }));
+
+                const { error: insertError } = await supabase
+                    .from('productos_relacionados')
+                    .insert(inserts);
+
+                if (insertError) {
+                    console.error('Error al insertar nuevas relaciones:', insertError);
+                    return res.status(500).json({ success: false, message: 'Error al insertar relaciones.', error: insertError.message });
+                }
+            }
+        }
+
+        return res.status(200).json({ success: true, message: 'Productos relacionados actualizados correctamente.' });
+    } catch (error) {
+        console.error('Error en upsertRelatedProducts:', error);
+        return res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+    }
+};
+
 export const createProduct = async (req, res) => {
     try {
         const productData = req.body;
